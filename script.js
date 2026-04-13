@@ -1,24 +1,26 @@
-// =============================================
-// YAPAY ZEKA KİTAP YORUMLAYICI
-// Google Gemini API Entegrasyonu
-// =============================================
+const GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-pro"
+];
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+let currentModelIndex = 0;
 
 // DOM
-const apiKeyInput    = document.getElementById("apiKeyInput");
-const saveApiBtn     = document.getElementById("saveApiBtn");
-const apiStatus      = document.getElementById("apiStatus");
-const bookTitle      = document.getElementById("bookTitle");
-const bookAuthor     = document.getElementById("bookAuthor");
-const reviewBtn      = document.getElementById("reviewBtn");
-const loadingCard    = document.getElementById("loadingCard");
-const loaderSub      = document.getElementById("loaderSub");
-const errorCard      = document.getElementById("errorCard");
-const errorText      = document.getElementById("errorText");
-const resultCard     = document.getElementById("resultCard");
+const apiKeyInput = document.getElementById("apiKeyInput");
+const saveApiBtn = document.getElementById("saveApiBtn");
+const apiStatus = document.getElementById("apiStatus");
+const bookTitle = document.getElementById("bookTitle");
+const bookAuthor = document.getElementById("bookAuthor");
+const reviewBtn = document.getElementById("reviewBtn");
+const loadingCard = document.getElementById("loadingCard");
+const loaderSub = document.getElementById("loaderSub");
+const errorCard = document.getElementById("errorCard");
+const errorText = document.getElementById("errorText");
+const resultCard = document.getElementById("resultCard");
 
-// Sayfa yüklendiğinde kayıtlı API key kontrol et
+// Sayfa yüklenince
 window.addEventListener("DOMContentLoaded", () => {
     const saved = localStorage.getItem("gemini_api_key");
     if (saved) {
@@ -27,7 +29,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// API KEY KAYDET
+// API Key kaydet
 saveApiBtn.addEventListener("click", () => {
     const key = apiKeyInput.value.trim();
     if (!key) {
@@ -38,7 +40,7 @@ saveApiBtn.addEventListener("click", () => {
     showApiOk("✅ API anahtarı kaydedildi!");
 });
 
-// ENTER İLE GEÇİŞ
+// Enter ile geçiş
 bookTitle.addEventListener("keypress", e => {
     if (e.key === "Enter") bookAuthor.focus();
 });
@@ -46,18 +48,17 @@ bookAuthor.addEventListener("keypress", e => {
     if (e.key === "Enter") handleReview();
 });
 
-// YORUM BUTONU
+// Buton
 reviewBtn.addEventListener("click", handleReview);
 
-// =============================================
+// ==================
 // ANA FONKSİYON
-// =============================================
+// ==================
 async function handleReview() {
-    const title  = bookTitle.value.trim();
+    const title = bookTitle.value.trim();
     const author = bookAuthor.value.trim();
     const apiKey = localStorage.getItem("gemini_api_key") || apiKeyInput.value.trim();
 
-    // Doğrulamalar
     if (!apiKey) {
         showError("Lütfen önce API anahtarınızı girin ve kaydedin.");
         return;
@@ -67,157 +68,196 @@ async function handleReview() {
         return;
     }
 
-    // UI güncelle
     hide(errorCard);
     hide(resultCard);
     show(loadingCard);
     reviewBtn.disabled = true;
     animateLoader();
 
-    try {
-        // Prompt oluştur
-        const prompt = buildPrompt(title, author);
+    // Tüm modelleri sırayla dene
+    currentModelIndex = 0;
+    let lastError = null;
 
-        // Gemini API çağrısı
-        const raw = await callGemini(apiKey, prompt);
+    while (currentModelIndex < GEMINI_MODELS.length) {
+        try {
+            const model = GEMINI_MODELS[currentModelIndex];
+            loaderSub.textContent = `${model} modeli deneniyor...`;
 
-        // JSON parse et
-        const data = parseResponse(raw);
+            const prompt = buildPrompt(title, author);
+            const raw = await callGemini(apiKey, prompt, model);
+            const data = parseResponse(raw);
 
-        // Göster
-        renderResult(title, author, data);
+            renderResult(title, author, data);
+            hide(loadingCard);
+            reviewBtn.disabled = false;
+            return; // Başarılı, çık
 
-    } catch (err) {
-        console.error(err);
-        showError(err.message || "Bir hata oluştu. Lütfen tekrar deneyin.");
-    } finally {
-        hide(loadingCard);
-        reviewBtn.disabled = false;
+        } catch (err) {
+            console.warn(`Model ${GEMINI_MODELS[currentModelIndex]} başarısız:`, err.message);
+            lastError = err;
+            currentModelIndex++;
+
+            if (currentModelIndex < GEMINI_MODELS.length) {
+                loaderSub.textContent = "Alternatif model deneniyor...";
+                await delay(1000);
+            }
+        }
     }
+
+    // Hiçbir model çalışmadıysa
+    hide(loadingCard);
+    reviewBtn.disabled = false;
+    showError(lastError?.message || "Tüm modeller başarısız oldu. Lütfen birkaç dakika bekleyip tekrar deneyin.");
 }
 
-// =============================================
-// PROMPT OLUŞTUR
-// =============================================
+// ==================
+// PROMPT
+// ==================
 function buildPrompt(title, author) {
-    return `Sen bir edebiyat eleştirmeni ve kitap uzmanısın.
+    return `Sen deneyimli bir edebiyat eleştirmenisin.
 
-Aşağıdaki kitap hakkında detaylı bir yorum hazırla:
+Kitap: "${title}"
+Yazar: ${author}
 
-📖 Kitap Adı: ${title}
-✍️ Yazar: ${author}
-
-Yanıtını MUTLAKA aşağıdaki JSON formatında ver. Başka hiçbir şey yazma, sadece JSON döndür:
+Bu kitap hakkında detaylı analiz yap. Yanıtını SADECE aşağıdaki JSON formatında ver, başka hiçbir şey yazma:
 
 {
-  "summary": "Kitabın içeriğini ve konusunu anlatan 3-5 cümlelik detaylı bir özet. Kitapta neler anlatılıyor, ana tema nedir, hangi olaylar yaşanıyor gibi bilgileri içersin.",
-  "genres": ["Tür1", "Tür2", "Tür3"],
+  "summary": "Kitabın konusunu ve içeriğini anlatan detaylı bir özet. Ana karakterler, olay örgüsü ve temel temalar hakkında 3-5 cümle yaz.",
+  "genres": ["Tür1", "Tür2"],
   "education_level": 3,
-  "education_text": "Bu kitabın hangi eğitim seviyesine uygun olduğunu ve nedenini açıkla.",
+  "education_text": "Hangi eğitim seviyesine uygun olduğunu ve nedenini açıkla.",
   "rating": 4,
-  "rating_text": "Kitabın neden bu puanı hak ettiğini açıkla.",
-  "comment": "Kitap hakkında 3-5 cümlelik derinlemesine bir genel yorum. Güçlü yönleri, zayıf yönleri, okuyucuya neler kattığı gibi bilgileri içersin."
+  "rating_text": "Bu puanı neden verdiğini açıkla.",
+  "comment": "Kitabın güçlü ve zayıf yönleri, edebiyat dünyasındaki yeri, okuyucuya neler kattığı hakkında 3-5 cümlelik kapsamlı yorum."
 }
 
-KURALLAR:
-- "genres" alanına kitabın edebiyat türlerini Türkçe olarak yaz (örn: Roman, Psikolojik Roman, Distopya, Şiir, Deneme, Tarih, Bilim Kurgu vb.)
-- "education_level" alanına 1 ile 5 arasında bir sayı yaz: 1=İlkokul, 2=Ortaokul, 3=Lise, 4=Üniversite, 5=Akademik
-- "rating" alanına 1 ile 5 arasında bir puan ver
-- Tüm metinleri TÜRKÇE yaz
-- SADECE JSON döndür, açıklama veya markdown ekleme`;
+Kurallar:
+- genres Türkçe olsun (Roman, Şiir, Deneme, Psikolojik Roman, Distopya, Bilim Kurgu, Tarih vb.)
+- education_level: 1=İlkokul, 2=Ortaokul, 3=Lise, 4=Üniversite, 5=Akademik
+- rating: 1-5 arası tam sayı
+- Her şey Türkçe olsun
+- YALNIZCA JSON döndür`;
 }
 
-// =============================================
-// GEMİNİ API ÇAĞRISI
-// =============================================
-async function callGemini(apiKey, prompt) {
-    const url = `${GEMINI_URL}?key=${apiKey}`;
+// ==================
+// API ÇAĞRISI
+// ==================
+async function callGemini(apiKey, prompt, model) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const body = {
-        contents: [{
-            parts: [{ text: prompt }]
-        }],
+        contents: [
+            {
+                parts: [{ text: prompt }]
+            }
+        ],
         generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 2048
         }
     };
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        if (res.status === 400) {
-            throw new Error("Geçersiz API anahtarı. Lütfen kontrol edin.");
-        }
-        if (res.status === 403) {
-            throw new Error("API anahtarınızın erişim izni yok. Google AI Studio'dan yeni anahtar alın.");
-        }
-        if (res.status === 429) {
-            throw new Error("Çok fazla istek gönderildi. Lütfen birkaç saniye bekleyip tekrar deneyin.");
-        }
-        throw new Error(errData?.error?.message || `API hatası: ${res.status}`);
+    let res;
+    try {
+        res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+    } catch (networkErr) {
+        throw new Error("İnternet bağlantınızı kontrol edin. Sunucuya ulaşılamadı.");
     }
 
-    const data = await res.json();
+    // Hata durumları
+    if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
 
+        try {
+            const errData = await res.json();
+            errMsg = errData?.error?.message || errMsg;
+        } catch (_) {}
+
+        if (res.status === 429) {
+            throw new Error("RATE_LIMIT"); // Özel işaret, sonraki modeli dene
+        }
+        if (res.status === 400) {
+            if (errMsg.toLowerCase().includes("api key")) {
+                throw new Error("API anahtarı geçersiz. Google AI Studio'dan yeni anahtar alın.");
+            }
+            throw new Error("RATE_LIMIT"); // Model desteklenmiyor olabilir
+        }
+        if (res.status === 403) {
+            throw new Error("API anahtarınızın erişim izni yok. Google AI Studio'dan kontrol edin.");
+        }
+        if (res.status === 404) {
+            throw new Error("RATE_LIMIT"); // Model bulunamadı, sonrakini dene
+        }
+        if (res.status === 500 || res.status === 503) {
+            throw new Error("RATE_LIMIT"); // Sunucu hatası, sonrakini dene
+        }
+
+        throw new Error(errMsg);
+    }
+
+    // Başarılı yanıt
+    const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!text) {
-        throw new Error("Yapay zekadan boş yanıt geldi. Lütfen tekrar deneyin.");
+        // Safety filter veya boş yanıt
+        const reason = data?.candidates?.[0]?.finishReason;
+        if (reason === "SAFETY") {
+            throw new Error("Yapay zeka güvenlik filtresine takıldı. Farklı bir kitap deneyin.");
+        }
+        throw new Error("RATE_LIMIT"); // Boş yanıt, sonraki modeli dene
     }
 
     return text;
 }
 
-// =============================================
-// YANITYI PARSE ET
-// =============================================
+// ==================
+// PARSE
+// ==================
 function parseResponse(raw) {
-    // JSON bloğunu bul (```json ... ``` veya düz JSON)
-    let jsonStr = raw;
+    let jsonStr = raw.trim();
 
-    // Markdown code block varsa temizle
-    const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) {
-        jsonStr = codeBlockMatch[1];
+    // Markdown code block temizle
+    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) {
+        jsonStr = match[1].trim();
     }
 
-    // Trim
-    jsonStr = jsonStr.trim();
+    // Bazen başında/sonunda fazladan karakter olabiliyor
+    const firstBrace = jsonStr.indexOf("{");
+    const lastBrace = jsonStr.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
 
     try {
         const obj = JSON.parse(jsonStr);
 
         return {
-            summary:        obj.summary         || "Bilgi bulunamadı.",
-            genres:         obj.genres           || ["Bilinmiyor"],
-            educationLevel: clamp(obj.education_level || 3, 1, 5),
-            educationText:  obj.education_text   || "Bilgi yok.",
-            rating:         clamp(obj.rating || 3, 1, 5),
-            ratingText:     obj.rating_text      || "Değerlendirme yok.",
-            comment:        obj.comment          || "Yorum bulunamadı."
+            summary: obj.summary || "Özet bilgisi alınamadı.",
+            genres: Array.isArray(obj.genres) ? obj.genres : ["Bilinmiyor"],
+            educationLevel: clamp(parseInt(obj.education_level) || 3, 1, 5),
+            educationText: obj.education_text || "Seviye bilgisi alınamadı.",
+            rating: clamp(parseInt(obj.rating) || 3, 1, 5),
+            ratingText: obj.rating_text || "Değerlendirme bilgisi alınamadı.",
+            comment: obj.comment || "Yorum bilgisi alınamadı."
         };
-
     } catch (e) {
-        console.error("JSON parse hatası:", e, "\nHam yanıt:", raw);
+        console.error("Parse hatası:", e, "\nHam:", raw);
         throw new Error("Yapay zekanın yanıtı işlenemedi. Lütfen tekrar deneyin.");
     }
 }
 
-// =============================================
-// SONUCU RENDER ET
-// =============================================
+// ==================
+// RENDER
+// ==================
 function renderResult(title, author, data) {
-
-    // Başlık
-    document.getElementById("resTitle").textContent  = `📖 ${title}`;
+    document.getElementById("resTitle").textContent = `📖 ${title}`;
     document.getElementById("resAuthor").textContent = `✍️ ${author}`;
-
-    // Özet
     document.getElementById("resSummary").textContent = data.summary;
 
     // Türler
@@ -251,31 +291,27 @@ function renderResult(title, author, data) {
         s.textContent = "★";
         starsEl.appendChild(s);
     }
-    document.getElementById("resScore").textContent   = `${data.rating}/5`;
+    document.getElementById("resScore").textContent = `${data.rating}/5`;
     document.getElementById("resRatingText").textContent = data.ratingText;
-
-    // Yorum
     document.getElementById("resComment").textContent = data.comment;
 
-    // Göster
     show(resultCard);
 
     setTimeout(() => {
         resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 200);
+    }, 300);
 }
 
-// =============================================
+// ==================
 // LOADING ANİMASYONU
-// =============================================
+// ==================
 function animateLoader() {
     const msgs = [
         "Kitap analiz ediliyor...",
         "İçerik inceleniyor...",
         "Edebiyat türü belirleniyor...",
         "Değerlendirme hazırlanıyor...",
-        "Yorum yazılıyor...",
-        "Son rötuşlar yapılıyor..."
+        "Yorum yazılıyor..."
     ];
     let i = 0;
     const interval = setInterval(() => {
@@ -285,14 +321,16 @@ function animateLoader() {
         }
         i = (i + 1) % msgs.length;
         loaderSub.textContent = msgs[i];
-    }, 2000);
+    }, 2500);
 }
 
-// =============================================
-// YARDIMCI FONKSİYONLAR
-// =============================================
+// ==================
+// YARDIMCILAR
+// ==================
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function showError(msg) {
     errorText.textContent = msg;
@@ -307,8 +345,4 @@ function showApiOk(msg) {
 function showApiErr(msg) {
     apiStatus.textContent = msg;
     apiStatus.className = "api-status err";
-}
-
-function clamp(val, min, max) {
-    return Math.max(min, Math.min(max, val));
 }
