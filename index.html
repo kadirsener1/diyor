@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Kitap Yorum AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-animation">
+        <div class="floating-book">📖</div>
+        <div class="floating-book">📚</div>
+        <div class="floating-book">📕</div>
+        <div class="floating-book">📗</div>
+        <div class="floating-book">📘</div>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <h1>Kitap Yorum AI</h1>
+            </div>
+            <p class="subtitle">Yapay zeka destekli kitap değerlendirme sistemi</p>
+        </header>
+
+        <main class="main-content">
+            <div class="input-card">
+                <div class="card-header">
+                    <span class="card-icon">✍️</span>
+                    <h2>Kitap Bilgilerini Girin</h2>
+                </div>
+                <div class="form-group">
+                    <label for="bookTitle">
+                        <span class="label-icon">📖</span> Kitap Adı
+                    </label>
+                    <input 
+                        type="text" 
+                        id="bookTitle" 
+                        placeholder="Örn: Suç ve Ceza" 
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="bookAuthor">
+                        <span class="label-icon">🖊️</span> Yazar
+                    </label>
+                    <input 
+                        type="text" 
+                        id="bookAuthor" 
+                        placeholder="Örn: Fyodor Dostoyevski" 
+                        autocomplete="off"
+                    >
+                </div>
+                <button id="reviewBtn" class="review-btn">
+                    <span class="btn-icon">🤖</span>
+                    <span class="btn-text">Yorumu Oluştur</span>
+                    <div class="btn-loader" id="btnLoader"></div>
+                </button>
+            </div>
+
+            <div class="result-card" id="resultCard">
+                <div class="result-header">
+                    <h2 id="resultTitle"></h2>
+                    <p id="resultAuthor"></p>
+                </div>
+
+                <div class="result-sections">
+                    <!-- İçerik Özeti -->
+                    <div class="result-section" id="summarySection">
+                        <div class="section-header">
+                            <span class="section-icon">📋</span>
+                            <h3>İçerik Özeti</h3>
+                        </div>
+                        <div class="section-body">
+                            <p id="summaryText"></p>
+                        </div>
+                    </div>
+
+                    <!-- Edebiyat Türü -->
+                    <div class="result-section" id="genreSection">
+                        <div class="section-header">
+                            <span class="section-icon">🏷️</span>
+                            <h3>Edebiyat Türü</h3>
+                        </div>
+                        <div class="section-body">
+                            <div class="genre-tags" id="genreTags"></div>
+                            <p id="genreDescription"></p>
+                        </div>
+                    </div>
+
+                    <!-- Eğitim Seviyesi -->
+                    <div class="result-section" id="levelSection">
+                        <div class="section-header">
+                            <span class="section-icon">🎓</span>
+                            <h3>Eğitim Seviyesi</h3>
+                        </div>
+                        <div class="section-body">
+                            <div class="level-indicator" id="levelIndicator"></div>
+                            <p id="levelText"></p>
+                        </div>
+                    </div>
+
+                    <!-- Değerlendirme -->
+                    <div class="result-section" id="ratingSection">
+                        <div class="section-header">
+                            <span class="section-icon">⭐</span>
+                            <h3>Değerlendirme</h3>
+                        </div>
+                        <div class="section-body">
+                            <div class="rating-display">
+                                <div class="stars" id="starsDisplay"></div>
+                                <div class="rating-number" id="ratingNumber"></div>
+                            </div>
+                            <p id="ratingText"></p>
+                        </div>
+                    </div>
+
+                    <!-- Genel Yorum -->
+                    <div class="result-section" id="commentSection">
+                        <div class="section-header">
+                            <span class="section-icon">💬</span>
+                            <h3>Genel Yorum</h3>
+                        </div>
+                        <div class="section-body">
+                            <p id="commentText"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hata Mesajı -->
+            <div class="error-card" id="errorCard">
+                <span class="error-icon">⚠️</span>
+                <p id="errorText"></p>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>📚 Kitap Yorum AI &copy; 2024 — Yapay Zeka Destekli Kitap Değerlendirme</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
