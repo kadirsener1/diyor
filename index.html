@@ -2,33 +2,49 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>📚 Kitap Yorumla AI</title>
+<title>📚 Kitap Yorum AI</title>
+
 <style>
 body {
     font-family: Arial;
     background: #121212;
     color: white;
     text-align: center;
-    padding: 30px;
+    padding: 40px;
 }
-input, button {
-    padding: 10px;
+h1 { color: #00e676; }
+
+input {
+    padding: 12px;
     margin: 10px;
-    width: 250px;
+    width: 260px;
+    border: none;
+    border-radius: 5px;
 }
+
 button {
+    padding: 12px 25px;
     background: #00c853;
     color: white;
     border: none;
+    border-radius: 5px;
     cursor: pointer;
 }
+
 #sonuc {
-    margin-top: 20px;
-    padding: 15px;
+    margin-top: 25px;
+    padding: 20px;
     background: #1e1e1e;
+    border-radius: 8px;
+    white-space: pre-line;
+}
+
+.loading {
+    color: orange;
 }
 </style>
 </head>
+
 <body>
 
 <h1>📚 Kitap Yorumlayan Yapay Zeka</h1>
@@ -44,37 +60,42 @@ button {
 
 <script>
 async function yorumYap() {
-    let kitap = document.getElementById("kitap").value;
-    let yazar = document.getElementById("yazar").value;
 
-    let prompt = `
-"${kitap}" adlı kitabı (${yazar}) için şu formatta yorum yap:
+    let kitap = document.getElementById("kitap").value.trim();
+    let yazar = document.getElementById("yazar").value.trim();
+    let sonuc = document.getElementById("sonuc");
 
-📖 Konu:
-🎭 Tür:
-🎓 Seviye:
-⭐ Puan (1-5):
+    if (!kitap || !yazar) {
+        sonuc.innerText = "⚠️ Lütfen kitap ve yazar gir!";
+        return;
+    }
 
-Kısa ve anlaşılır olsun.
-`;
+    sonuc.innerHTML = "<span class='loading'>⏳ Yorum oluşturuluyor...</span>";
 
-    let response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": "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"
-        },
-        body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.7
-        })
-    });
+    try {
+        let response = await fetch("api.php", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                kitap: kitap,
+                yazar: yazar
+            })
+        });
 
-    let data = await response.json();
+        let data = await response.json();
 
-    document.getElementById("sonuc").innerText =
-        data.choices[0].message.content;
+        if (data.error) {
+            sonuc.innerText = "❌ Hata: " + data.error;
+            return;
+        }
+
+        sonuc.innerText = data.cevap;
+
+    } catch (err) {
+        sonuc.innerText = "❌ Bağlantı hatası: " + err.message;
+    }
 }
 </script>
 
