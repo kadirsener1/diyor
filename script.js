@@ -1,234 +1,314 @@
-// DOM ELEMENTLERİ
-const bookTitleInput = document.getElementById('bookTitle');
-const bookAuthorInput = document.getElementById('bookAuthor');
-const reviewBtn = document.getElementById('reviewBtn');
-const loadingScreen = document.getElementById('loadingScreen');
-const resultCard = document.getElementById('resultCard');
-const errorCard = document.getElementById('errorCard');
+// =============================================
+// YAPAY ZEKA KİTAP YORUMLAYICI
+// Google Gemini API Entegrasyonu
+// =============================================
 
-// SONUÇ ELEMENTLERİ
-const resultTitle = document.getElementById('resultTitle');
-const resultAuthor = document.getElementById('resultAuthor');
-const summaryText = document.getElementById('summaryText');
-const genreText = document.getElementById('genreText');
-const levelText = document.getElementById('levelText');
-const starsDisplay = document.getElementById('starsDisplay');
-const ratingNumber = document.getElementById('ratingNumber');
-const ratingText = document.getElementById('ratingText');
-const commentText = document.getElementById('commentText');
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-// EVENT LISTENER
-reviewBtn.addEventListener('click', handleReview);
+// DOM
+const apiKeyInput    = document.getElementById("apiKeyInput");
+const saveApiBtn     = document.getElementById("saveApiBtn");
+const apiStatus      = document.getElementById("apiStatus");
+const bookTitle      = document.getElementById("bookTitle");
+const bookAuthor     = document.getElementById("bookAuthor");
+const reviewBtn      = document.getElementById("reviewBtn");
+const loadingCard    = document.getElementById("loadingCard");
+const loaderSub      = document.getElementById("loaderSub");
+const errorCard      = document.getElementById("errorCard");
+const errorText      = document.getElementById("errorText");
+const resultCard     = document.getElementById("resultCard");
 
-bookTitleInput.addEventListener('keypress', e => {
-    if (e.key === 'Enter') bookAuthorInput.focus();
+// Sayfa yüklendiğinde kayıtlı API key kontrol et
+window.addEventListener("DOMContentLoaded", () => {
+    const saved = localStorage.getItem("gemini_api_key");
+    if (saved) {
+        apiKeyInput.value = saved;
+        showApiOk("✅ API anahtarı kayıtlı.");
+    }
 });
 
-bookAuthorInput.addEventListener('keypress', e => {
-    if (e.key === 'Enter') handleReview();
+// API KEY KAYDET
+saveApiBtn.addEventListener("click", () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) {
+        showApiErr("Lütfen bir API anahtarı girin.");
+        return;
+    }
+    localStorage.setItem("gemini_api_key", key);
+    showApiOk("✅ API anahtarı kaydedildi!");
 });
 
+// ENTER İLE GEÇİŞ
+bookTitle.addEventListener("keypress", e => {
+    if (e.key === "Enter") bookAuthor.focus();
+});
+bookAuthor.addEventListener("keypress", e => {
+    if (e.key === "Enter") handleReview();
+});
+
+// YORUM BUTONU
+reviewBtn.addEventListener("click", handleReview);
+
+// =============================================
 // ANA FONKSİYON
+// =============================================
 async function handleReview() {
-    const title = bookTitleInput.value.trim();
-    const author = bookAuthorInput.value.trim();
+    const title  = bookTitle.value.trim();
+    const author = bookAuthor.value.trim();
+    const apiKey = localStorage.getItem("gemini_api_key") || apiKeyInput.value.trim();
 
-    // Doğrulama
+    // Doğrulamalar
+    if (!apiKey) {
+        showError("Lütfen önce API anahtarınızı girin ve kaydedin.");
+        return;
+    }
     if (!title || !author) {
-        showError("Lütfen hem kitap adı hem de yazar bilgisi girin.");
+        showError("Lütfen kitap adı ve yazar bilgisini girin.");
         return;
     }
 
-    // UI Güncellemeleri
-    hideError();
-    hideResult();
-    showLoading();
+    // UI güncelle
+    hide(errorCard);
+    hide(resultCard);
+    show(loadingCard);
+    reviewBtn.disabled = true;
+    animateLoader();
 
     try {
-        // Yapay zekaya sor
-        const response = await getAIReview(title, author);
+        // Prompt oluştur
+        const prompt = buildPrompt(title, author);
 
-        // Başarılı cevabı işle
-        displayResult(title, author, response);
-    } catch (error) {
-        console.error("AI hatası:", error);
-        showError(error.message || "Yapay zekaya ulaşılırken bir hata oluştu.");
+        // Gemini API çağrısı
+        const raw = await callGemini(apiKey, prompt);
+
+        // JSON parse et
+        const data = parseResponse(raw);
+
+        // Göster
+        renderResult(title, author, data);
+
+    } catch (err) {
+        console.error(err);
+        showError(err.message || "Bir hata oluştu. Lütfen tekrar deneyin.");
     } finally {
-        hideLoading();
+        hide(loadingCard);
+        reviewBtn.disabled = false;
     }
 }
 
-// YAPAY ZEKADAN CEVAP AL (Simülasyon)
-async function getAIReview(bookTitle, authorName) {
-    // Simüle edilmiş AI yanıtı (gerçek dünyada buraya API çağrısı gelir)
-    const prompt = `
-    Aşağıdaki kitabı analiz et:
-    Kitap: ${bookTitle}
-    Yazar: ${authorName}
+// =============================================
+// PROMPT OLUŞTUR
+// =============================================
+function buildPrompt(title, author) {
+    return `Sen bir edebiyat eleştirmeni ve kitap uzmanısın.
 
-    Lütfen aşağıdaki formatta kısa ve net bir yanıt ver:
-    
-    İÇERİK ÖZETİ:
-    [Kitabın ana konusunu anlat]
+Aşağıdaki kitap hakkında detaylı bir yorum hazırla:
 
-    EDEBİYAT TÜRÜ:
-    [Roman, hikaye, şiir vs. + alt türler]
+📖 Kitap Adı: ${title}
+✍️ Yazar: ${author}
 
-    EĞİTİM SEVİYESİ:
-    [İlkokul / Ortaokul / Lise / Üniversite / Akademik] seviyesine uygun mudur? Neden?
+Yanıtını MUTLAKA aşağıdaki JSON formatında ver. Başka hiçbir şey yazma, sadece JSON döndür:
 
-    DEĞERLENDİRME (1-5):
-    [1-5 arası puan]
-    [Kısa değerlendirme metni]
-
-    GENEL YORUM:
-    [Eserin güçlü yönleri, eleştiriler, okuyucuya mesaj gibi derinlemesine bir yorum]
-    
-    LÜTFEN BU FORMATTA TAM OLARAK YANIT VER, BAŞLIKLARI AYNEN KULLAN.
-    `;
-
-    // Simüle edilmiş gecikme (API bekleme süresi taklidi)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Burada normalde bir API çağrısı olurdu:
-    // const res = await fetch("https://api.openai.com/v1/chat/completions", { ... })
-    // Ancak şu anda doğrudan ben (AI) ile konuşuyoruz, bu yüzden kendim yanıt oluşturuyorum.
-
-    // ⚠️ NOT: Bu simülasyon, gerçek bir API çağrısı değil, benim (AI) içsel yanıt üretimidir.
-    // Gerçek sistemde buraya dış API entegrasyonu eklenir.
-
-    return generateAIRawResponse(bookTitle, authorName);
+{
+  "summary": "Kitabın içeriğini ve konusunu anlatan 3-5 cümlelik detaylı bir özet. Kitapta neler anlatılıyor, ana tema nedir, hangi olaylar yaşanıyor gibi bilgileri içersin.",
+  "genres": ["Tür1", "Tür2", "Tür3"],
+  "education_level": 3,
+  "education_text": "Bu kitabın hangi eğitim seviyesine uygun olduğunu ve nedenini açıkla.",
+  "rating": 4,
+  "rating_text": "Kitabın neden bu puanı hak ettiğini açıkla.",
+  "comment": "Kitap hakkında 3-5 cümlelik derinlemesine bir genel yorum. Güçlü yönleri, zayıf yönleri, okuyucuya neler kattığı gibi bilgileri içersin."
 }
 
-// SIMÜLE EDİLMİŞ AI YANITI (GERÇEK ZAMANLI ÜRETİM)
-function generateAIRawResponse(title, author) {
-    // Bu fonksiyon, benim (AI) doğrudan ürettiğim içerikten örnekler sunar.
-    // Gerçek bir sistemde bu, API'den gelen ham metin olur.
-
-    return `
-İÇERİK ÖZETİ:
-${title}, ${author} tarafından kaleme alınmış önemli bir eserdir. Roman, başkahramanının içsel çatışmaları, toplumsal baskılar ve kişisel dönüşüm süreci etrafında gelişir. Eser boyunca insan doğasının karanlık ve aydınlık yönleri, ahlaki ikilemler ve varoluşsal sorgulamalar detaylı bir şekilde işlenir. Özellikle bireyin toplumla olan ilişkisi, özgürlük, suç ve vicdan gibi temalar yoğun bir dille ele alınır. Okuyucuyu sadece hikâyeye değil, aynı zamanda kendine dönüp düşünmeye de davet eder.
-
-EDEBİYAT TÜRÜ:
-Roman, Psikolojik Roman, Toplumsal Gerçekçilik
-
-EĞİTİM SEVİYESİ:
-Üniversite seviyesine uygundur. Psikolojik derinlik, felsefi temalar ve karmaşık karakter analizleri nedeniyle lise öğrencileri rehberlikle okuyabilir, ancak tam anlamıyla kavrayabilmek için edebi ve felsefi birikim gereklidir.
-
-DEĞERLENDİRME (1-5):
-5/5
-Dünya edebiyatının en büyük başyapıtlarından biri olarak kabul edilir. Derin karakter incelemesi, sosyal eleştiri ve dil ustalığıyla öne çıkar.
-
-GENEL YORUM:
-${title}, sadece bir roman değil, insan ruhunun anatomisini çıkaran bir psikolojik ve felsefi incelemedir. ${author}, karakterlerinin iç dünyasına olağanüstü bir gözlem gücüyle nüfuz eder. Eser, zaman içinde güncelliğini kaybetmemiş, her kuşağa yeni şeyler söyleyen evrensel bir temaya sahiptir. Dil, düşünce ve duyguyu harmanlayan bu yapıt, edebiyatın sınırlarını zorlamıştır. Özellikle modern bireyin yalnızlığı, yabancılaşması ve ahlaki sorgulamaları günümüzde daha da önem kazanmıştır. Her düşünen insanın hayatında en az bir kez okuması gereken bir eserdir.
-    `;
+KURALLAR:
+- "genres" alanına kitabın edebiyat türlerini Türkçe olarak yaz (örn: Roman, Psikolojik Roman, Distopya, Şiir, Deneme, Tarih, Bilim Kurgu vb.)
+- "education_level" alanına 1 ile 5 arasında bir sayı yaz: 1=İlkokul, 2=Ortaokul, 3=Lise, 4=Üniversite, 5=Akademik
+- "rating" alanına 1 ile 5 arasında bir puan ver
+- Tüm metinleri TÜRKÇE yaz
+- SADECE JSON döndür, açıklama veya markdown ekleme`;
 }
 
-// YANITI PARSING (AYIKLAMA)
-function parseAIResponse(rawText) {
-    const sections = {};
-    const keys = [
-        'İÇERİK ÖZETİ',
-        'EDEBİYAT TÜRÜ',
-        'EĞİTİM SEVİYESİ',
-        'DEĞERLENDİRME \\(1-5\\)',
-        'GENEL YORUM'
-    ];
+// =============================================
+// GEMİNİ API ÇAĞRISI
+// =============================================
+async function callGemini(apiKey, prompt) {
+    const url = `${GEMINI_URL}?key=${apiKey}`;
 
-    let currentKey = null;
-    const lines = rawText.split('\n').map(line => line.trim()).filter(line => line);
-
-    for (const line of lines) {
-        const match = keys.find(k => line.match(new RegExp('^' + k)));
-        if (match) {
-            currentKey = match.replace(/\s*\\\(.*\\\)/, '').trim();
-            sections[currentKey] = '';
-        } else if (currentKey && line && !line.match(/^[A-ZİÇĞ]/)) {
-            sections[currentKey] += line + ' ';
+    const body = {
+        contents: [{
+            parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048
         }
-    }
+    };
 
-    // Temizle
-    Object.keys(sections).forEach(key => {
-        sections[key] = sections[key].trim();
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
     });
 
-    // Puanlama ayrıştırma
-    const ratingLine = sections['DEĞERLENDİRME (1-5)']?.split('\n')[0];
-    let rating = 3;
-    const ratingMatch = ratingLine?.match(/(\d)\/5/);
-    if (ratingMatch) rating = parseInt(ratingMatch[1]);
-
-    return {
-        summary: sections['İÇERİK ÖZETİ'] || "Veri bulunamadı.",
-        genres: sections['EDEBİYAT TÜRÜ']?.split(',').map(g => g.trim()) || ["Bilinmiyor"],
-        educationLevel: extractEducationLevel(sections['EĞİTİM SEVİYESİ']),
-        educationText: sections['EĞİTİM SEVİYESİ'] || "Seviye bilgisi mevcut değil.",
-        rating: rating,
-        ratingText: sections['DEĞERLENDİRME (1-5)']?.replace(/\d\/5/, '').trim() || "Değerlendirme yok.",
-        comment: sections['GENEL YORUM'] || "Yorum bulunamadı."
-    };
-}
-
-function extractEducationLevel(text) {
-    if (text.includes('Akademik')) return 5;
-    if (text.includes('Üniversite')) return 4;
-    if (text.includes('Lise')) return 3;
-    if (text.includes('Ortaokul')) return 2;
-    if (text.includes('İlkokul')) return 1;
-    return 3; // varsayılan
-}
-
-// SONUCU GÖSTER
-function displayResult(title, author, data) {
-    resultTitle.textContent = `📖 ${title}`;
-    resultAuthor.textContent = `✍️ ${author}`;
-
-    summaryText.textContent = data.summary;
-    genreText.textContent = data.genres.join(', ');
-    levelText.textContent = data.educationText;
-
-    // Yıldızları oluştur
-    starsDisplay.innerHTML = '';
-    for (let i = 1; i <= 5; i++) {
-        const star = document.createElement('span');
-        star.textContent = i <= data.rating ? '⭐' : '☆';
-        starsDisplay.appendChild(star);
+    if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 400) {
+            throw new Error("Geçersiz API anahtarı. Lütfen kontrol edin.");
+        }
+        if (res.status === 403) {
+            throw new Error("API anahtarınızın erişim izni yok. Google AI Studio'dan yeni anahtar alın.");
+        }
+        if (res.status === 429) {
+            throw new Error("Çok fazla istek gönderildi. Lütfen birkaç saniye bekleyip tekrar deneyin.");
+        }
+        throw new Error(errData?.error?.message || `API hatası: ${res.status}`);
     }
 
-    ratingNumber.textContent = `${data.rating}/5`;
-    ratingText.textContent = data.ratingText;
-    commentText.textContent = data.comment;
+    const data = await res.json();
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+        throw new Error("Yapay zekadan boş yanıt geldi. Lütfen tekrar deneyin.");
+    }
+
+    return text;
+}
+
+// =============================================
+// YANITYI PARSE ET
+// =============================================
+function parseResponse(raw) {
+    // JSON bloğunu bul (```json ... ``` veya düz JSON)
+    let jsonStr = raw;
+
+    // Markdown code block varsa temizle
+    const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1];
+    }
+
+    // Trim
+    jsonStr = jsonStr.trim();
+
+    try {
+        const obj = JSON.parse(jsonStr);
+
+        return {
+            summary:        obj.summary         || "Bilgi bulunamadı.",
+            genres:         obj.genres           || ["Bilinmiyor"],
+            educationLevel: clamp(obj.education_level || 3, 1, 5),
+            educationText:  obj.education_text   || "Bilgi yok.",
+            rating:         clamp(obj.rating || 3, 1, 5),
+            ratingText:     obj.rating_text      || "Değerlendirme yok.",
+            comment:        obj.comment          || "Yorum bulunamadı."
+        };
+
+    } catch (e) {
+        console.error("JSON parse hatası:", e, "\nHam yanıt:", raw);
+        throw new Error("Yapay zekanın yanıtı işlenemedi. Lütfen tekrar deneyin.");
+    }
+}
+
+// =============================================
+// SONUCU RENDER ET
+// =============================================
+function renderResult(title, author, data) {
+
+    // Başlık
+    document.getElementById("resTitle").textContent  = `📖 ${title}`;
+    document.getElementById("resAuthor").textContent = `✍️ ${author}`;
+
+    // Özet
+    document.getElementById("resSummary").textContent = data.summary;
+
+    // Türler
+    const tagsEl = document.getElementById("resTags");
+    tagsEl.innerHTML = "";
+    data.genres.forEach(g => {
+        const span = document.createElement("span");
+        span.className = "tag";
+        span.textContent = g;
+        tagsEl.appendChild(span);
+    });
+
+    // Seviye
+    const levelNames = ["İlkokul", "Ortaokul", "Lise", "Üniversite", "Akademik"];
+    const barsEl = document.getElementById("resLevelBars");
+    barsEl.innerHTML = "";
+    levelNames.forEach((name, i) => {
+        const bar = document.createElement("div");
+        bar.className = "level-bar" + (i < data.educationLevel ? " active" : "");
+        bar.textContent = name;
+        barsEl.appendChild(bar);
+    });
+    document.getElementById("resLevelText").textContent = data.educationText;
+
+    // Puan
+    const starsEl = document.getElementById("resStars");
+    starsEl.innerHTML = "";
+    for (let i = 1; i <= 5; i++) {
+        const s = document.createElement("span");
+        s.className = i <= data.rating ? "star-filled" : "star-empty";
+        s.textContent = "★";
+        starsEl.appendChild(s);
+    }
+    document.getElementById("resScore").textContent   = `${data.rating}/5`;
+    document.getElementById("resRatingText").textContent = data.ratingText;
+
+    // Yorum
+    document.getElementById("resComment").textContent = data.comment;
 
     // Göster
-    resultCard.classList.remove('hidden');
-    resultCard.classList.add('fade-in');
+    show(resultCard);
 
-    // Scroll
     setTimeout(() => {
-        resultCard.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
+        resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
 }
 
+// =============================================
+// LOADING ANİMASYONU
+// =============================================
+function animateLoader() {
+    const msgs = [
+        "Kitap analiz ediliyor...",
+        "İçerik inceleniyor...",
+        "Edebiyat türü belirleniyor...",
+        "Değerlendirme hazırlanıyor...",
+        "Yorum yazılıyor...",
+        "Son rötuşlar yapılıyor..."
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+        if (loadingCard.classList.contains("hidden")) {
+            clearInterval(interval);
+            return;
+        }
+        i = (i + 1) % msgs.length;
+        loaderSub.textContent = msgs[i];
+    }, 2000);
+}
+
+// =============================================
 // YARDIMCI FONKSİYONLAR
-function showLoading() {
-    loadingScreen.classList.remove('hidden');
+// =============================================
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
+
+function showError(msg) {
+    errorText.textContent = msg;
+    show(errorCard);
 }
 
-function hideLoading() {
-    loadingScreen.classList.add('hidden');
+function showApiOk(msg) {
+    apiStatus.textContent = msg;
+    apiStatus.className = "api-status ok";
 }
 
-function showError(message) {
-    errorCard.classList.remove('hidden');
-    document.getElementById('errorText').textContent = message;
+function showApiErr(msg) {
+    apiStatus.textContent = msg;
+    apiStatus.className = "api-status err";
 }
 
-function hideError() {
-    errorCard.classList.add('hidden');
-}
-
-function hideResult() {
-    resultCard.classList.add('hidden');
-    resultCard.classList.remove('fade-in');
+function clamp(val, min, max) {
+    return Math.max(min, Math.min(max, val));
 }
