@@ -26,6 +26,39 @@
         </header>
 
         <main class="main-content">
+            <!-- API Key Kartı -->
+            <div class="api-card" id="apiCard">
+                <div class="card-header">
+                    <span class="card-icon">🔑</span>
+                    <h2>API Anahtarı</h2>
+                </div>
+                <p class="api-info">
+                    Google Gemini API anahtarınızı girin. 
+                    <a href="https://aistudio.google.com/apikey" target="_blank" class="api-link">
+                        Buradan ücretsiz alabilirsiniz →
+                    </a>
+                </p>
+                <div class="form-group">
+                    <label for="apiKey">
+                        <span class="label-icon">🔐</span> Gemini API Key
+                    </label>
+                    <div class="api-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="apiKey" 
+                            placeholder="AIzaSy..." 
+                            autocomplete="off"
+                        >
+                        <button class="toggle-api-key" id="toggleApiBtn" title="Göster/Gizle">👁️</button>
+                    </div>
+                </div>
+                <div class="api-status" id="apiStatus">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">API anahtarı bekleniyor</span>
+                </div>
+            </div>
+
+            <!-- Kitap Giriş Kartı -->
             <div class="input-card">
                 <div class="card-header">
                     <span class="card-icon">✍️</span>
@@ -55,11 +88,12 @@
                 </div>
                 <button id="reviewBtn" class="review-btn">
                     <span class="btn-icon">🤖</span>
-                    <span class="btn-text">Yorumu Oluştur</span>
+                    <span class="btn-text">Yapay Zekaya Sor</span>
                     <div class="btn-loader" id="btnLoader"></div>
                 </button>
             </div>
 
+            <!-- Sonuç Kartı -->
             <div class="result-card" id="resultCard">
                 <div class="result-header">
                     <h2 id="resultTitle"></h2>
@@ -138,7 +172,7 @@
         </main>
 
         <footer class="footer">
-            <p>📚 Kitap Yorum AI &copy; 2024 — Yapay Zeka Destekli Kitap Değerlendirme</p>
+            <p>📚 Kitap Yorum AI &copy; 2024 — Google Gemini ile çalışır</p>
         </footer>
     </div>
 
