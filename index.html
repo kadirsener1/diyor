@@ -1,158 +1,82 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 AI Kitap Yorumlayıcı</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<title>📚 Kitap Yorum AI</title>
+<style>
+body {
+    font-family: Arial;
+    background: #121212;
+    color: white;
+    text-align: center;
+    padding: 30px;
+}
+input, button {
+    padding: 10px;
+    margin: 10px;
+    width: 250px;
+}
+button {
+    background: #00c853;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+#sonuc {
+    margin-top: 20px;
+    padding: 15px;
+    background: #1e1e1e;
+}
+</style>
 </head>
 <body>
 
-<div class="app">
+<h1>📚 Kitap Yorumlayan Yapay Zeka</h1>
 
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-icon">📚</div>
-        <h1>Yapay Zeka Kitap Yorumlayıcı</h1>
-        <p>Kitap adını ve yazarı gir, yapay zeka sana detaylı yorum üretsin!</p>
-    </header>
+<input type="text" id="kitap" placeholder="Kitap Adı">
+<br>
+<input type="text" id="yazar" placeholder="Yazar">
+<br>
 
-    <!-- API KEY GİRİŞİ -->
-    <div class="card api-card" id="apiCard">
-        <h2>🔑 API Anahtarı</h2>
-        <p class="hint">
-            Ücretsiz API anahtarı almak için:
-            <a href="https://aistudio.google.com/app/apikey" target="_blank">
-                Google AI Studio
-            </a> → "Create API Key" butonuna tıklayın.
-        </p>
-        <div class="form-group">
-            <input 
-                type="password" 
-                id="apiKeyInput" 
-                placeholder="API anahtarınızı buraya yapıştırın..."
-            >
-        </div>
-        <button class="btn btn-secondary" id="saveApiBtn">
-            💾 Anahtarı Kaydet
-        </button>
-        <div class="api-status" id="apiStatus"></div>
-    </div>
+<button onclick="yorumYap()">Yorumla</button>
 
-    <!-- KİTAP GİRİŞ FORMU -->
-    <div class="card">
-        <h2>📖 Kitap Bilgileri</h2>
-        <div class="form-group">
-            <label for="bookTitle">Kitap Adı</label>
-            <input 
-                type="text" 
-                id="bookTitle" 
-                placeholder="Örn: Suç ve Ceza"
-                autocomplete="off"
-            >
-        </div>
-        <div class="form-group">
-            <label for="bookAuthor">Yazar</label>
-            <input 
-                type="text" 
-                id="bookAuthor" 
-                placeholder="Örn: Fyodor Dostoyevski"
-                autocomplete="off"
-            >
-        </div>
-        <button class="btn btn-primary" id="reviewBtn">
-            🤖 Yapay Zekadan Yorum Al
-        </button>
-    </div>
+<div id="sonuc"></div>
 
-    <!-- LOADING -->
-    <div class="card loading-card hidden" id="loadingCard">
-        <div class="loader">
-            <div class="loader-spinner"></div>
-            <div class="loader-text">
-                <p class="loader-main">Yapay zeka düşünüyor...</p>
-                <p class="loader-sub" id="loaderSub">Kitap analiz ediliyor</p>
-            </div>
-        </div>
-    </div>
+<script>
+async function yorumYap() {
+    let kitap = document.getElementById("kitap").value;
+    let yazar = document.getElementById("yazar").value;
 
-    <!-- HATA -->
-    <div class="card error-card hidden" id="errorCard">
-        <div class="error-content">
-            <span class="error-icon">❌</span>
-            <p id="errorText"></p>
-        </div>
-    </div>
+    let prompt = `
+"${kitap}" adlı kitabı (${yazar}) için şu formatta yorum yap:
 
-    <!-- SONUÇ -->
-    <div class="result hidden" id="resultCard">
+📖 Konu:
+🎭 Tür:
+🎓 Seviye:
+⭐ Puan (1-5):
 
-        <!-- Başlık -->
-        <div class="result-header">
-            <h2 id="resTitle"></h2>
-            <p id="resAuthor"></p>
-        </div>
+Kısa ve anlaşılır olsun.
+`;
 
-        <!-- İçerik Özeti -->
-        <div class="card result-section">
-            <div class="section-title">
-                <span>📋</span>
-                <h3>İçerik Özeti</h3>
-            </div>
-            <p id="resSummary"></p>
-        </div>
+    let response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer API_KEY_BURAYA"
+        },
+        body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.7
+        })
+    });
 
-        <!-- Tür -->
-        <div class="card result-section">
-            <div class="section-title">
-                <span>🏷️</span>
-                <h3>Edebiyat Türü</h3>
-            </div>
-            <div class="tags" id="resTags"></div>
-        </div>
+    let data = await response.json();
 
-        <!-- Seviye -->
-        <div class="card result-section">
-            <div class="section-title">
-                <span>🎓</span>
-                <h3>Eğitim Seviyesi</h3>
-            </div>
-            <div class="level-bars" id="resLevelBars"></div>
-            <p id="resLevelText"></p>
-        </div>
+    document.getElementById("sonuc").innerText =
+        data.choices[0].message.content;
+}
+</script>
 
-        <!-- Puan -->
-        <div class="card result-section">
-            <div class="section-title">
-                <span>⭐</span>
-                <h3>Değerlendirme</h3>
-            </div>
-            <div class="rating-row">
-                <div class="stars-row" id="resStars"></div>
-                <div class="score" id="resScore"></div>
-            </div>
-            <p id="resRatingText"></p>
-        </div>
-
-        <!-- Yorum -->
-        <div class="card result-section">
-            <div class="section-title">
-                <span>💬</span>
-                <h3>Genel Yorum</h3>
-            </div>
-            <p id="resComment"></p>
-        </div>
-
-    </div>
-
-    <!-- FOOTER -->
-    <footer class="footer">
-        <p>Yapay Zeka Kitap Yorumlayıcı © 2024 — Google Gemini API ile çalışır</p>
-    </footer>
-
-</div>
-
-<script src="script.js"></script>
 </body>
 </html>
